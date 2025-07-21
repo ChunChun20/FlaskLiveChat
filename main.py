@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, session, redirect, url_for
 from flask_socketio import SocketIO,join_room,leave_room,send
 import random
 from string import ascii_uppercase
+from datetime import datetime
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'C@tsg0me0w'
@@ -13,18 +14,17 @@ class Rooms:
 
 
 class Room:
-    def __init__(self,code):
+    def __init__(self,code:str):
         self.code = code
         self.members = 0
-        self.messages = []
+        self.messages: list[dict] = []
 
 rooms = Rooms()
 
 
-def generate_room_code(Length):
-    code = ""
-    for _ in range(Length):
-        code += random.choice(ascii_uppercase)
+def generate_room_code(length:int) -> str:
+    """Randomly generating room code"""
+    code = "".join(random.choices(ascii_uppercase, k=length))
 
 
     return code
@@ -32,6 +32,14 @@ def generate_room_code(Length):
 def get_room(room_code: str) -> Room | None:
     '''Returns Room object if there is a room with that code or None'''
     return next((room for room in rooms.rooms if room.code == room_code), None)
+
+def get_current_date() -> str:
+    now = datetime.now()
+    formatted = now.strftime("%m/%d/%Y, %I:%M:%S %p")
+
+    if formatted.startswith("0"):
+        formatted = formatted[1:]
+    return formatted
 
 @app.route('/',methods=['GET','POST'])
 def home():
@@ -61,7 +69,6 @@ def home():
 
         session["room"] = room.code
         session["name"] = name
-        # session["room_obj"] = room
         print(session["room"])
         print(session["name"])
         return redirect(url_for("room"))
@@ -95,7 +102,7 @@ def connect(auth):
         return
 
     join_room(room_code)
-    send({"name": name,"message": "has entered the room"},to=room_code)
+    send({"name": name,"message": "has entered the room","date": get_current_date()},to=room_code)
     room.members += 1
     print(f"{name} joined room {room_code}")
 
@@ -112,7 +119,7 @@ def disconnect():
             rooms.rooms.remove(room)
             del room
 
-    send({"name": name, "message": "has left the room"}, to=room_code)
+    send({"name": name, "message": "has left the room","date": get_current_date()}, to=room_code)
     print(f"{name} has left the room {room_code}")
 
     leave_room(room_code)
@@ -126,12 +133,13 @@ def message(data):
 
     content = {
         "name": session.get("name"),
-        "message": data["data"]
+        "message": data["data"],
+        "date": get_current_date()
     }
 
     send(content,to=room_code)
     room.messages.append(content)
-    print(f"{session.get('name')} said: {data['data']}")
+    print(f"{session.get('name')} said: {data['data']} at {get_current_date()}")
 
 
 
