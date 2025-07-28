@@ -1,8 +1,19 @@
 {% extends 'base.html' %}
 {% block title %} Chat Room {% endblock %}
 {% block content %}
+
     <div class="message-box">
+        <div class="header-row">
         <h2>Chat Room: {{ code }}</h2>
+        <div class="settings-wrapper">
+            <button id="settings-btn" class="settings-button">⚙️</button>
+            <div id="settings-menu" class="settings-menu" style="display: none;">
+                <label for="text-color-picker">Text Color:</label>
+                <input type="color" id="text-color-picker" value="#000000" />
+            </div>
+        </div>
+    </div>
+
         <div class="messages" id="messages"></div>
         <div class="inputs">
             <input class="chat-input" type="text" rows="3" placeholder="Message" name="message" id="message"/>
@@ -14,12 +25,16 @@
 
 <script type="text/javascript">
     let socketio = io();
+    let textColor = "#000000"
+    let hasChangedColor = false
+
 
     const messages = document.getElementById("messages")
 
-    const createMessage = (name,msg,date) => {
+    const createMessage = (name,msg,date,text_color) => {
+
         const content = `
-        <div class="text">
+        <div class="text" style="${text_color}">
         <span>
         <strong>${name}</strong>: ${msg}</span>
         <span class="muted">
@@ -32,20 +47,38 @@
     };
 
     socketio.on("message", (data) => {
-        createMessage(data.name,data.message,data.date)
+        createMessage(data.name,data.message,data.date,data.text_color)
     })
 
     const sendMessage = () => {
         const message = document.getElementById("message")
         if (message.value == "") return;
-        socketio.emit("message", {data: message.value})
+
+        const payload = {data: message.value, text_color: ""};
+
+        if (hasChangedColor) {
+            payload.text_color = textColor
+        }
+
+        socketio.emit("message", payload)
         message.value = "";
+        hasChangedColor = false
     };
+
+    document.getElementById("settings-btn").addEventListener("click", () => {
+        const menu = document.getElementById("settings-menu");
+        menu.style.display = menu.style.display === "none" ? "block" : "none";
+    });
+
+    document.getElementById("text-color-picker").addEventListener("input", (e) => {
+        textColor = e.target.value;
+        hasChangedColor = true
+    });
 
 </script>
 {% for msg in messages %}
 <script type="text/javascript">
-    createMessage("{{ msg.name }}", "{{ msg.message }}", "{{ msg.date }}");
+    createMessage("{{ msg.name }}", "{{ msg.message }}", "{{ msg.date }}", "{{ msg.text_color }}");
 </script>
 {% endfor %}
 {% endblock %}

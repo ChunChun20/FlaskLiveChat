@@ -18,6 +18,7 @@ class Room:
         self.code = code
         self.members = 0
         self.messages: list[dict] = []
+        self.text_color = "color: #000000"
 
 rooms = Rooms()
 
@@ -71,6 +72,7 @@ def home():
         session["name"] = name
         print(session["room"])
         print(session["name"])
+
         return redirect(url_for("room"))
 
     return render_template("home.html")
@@ -85,6 +87,8 @@ def room():
     if room_code is None or session.get("name") is None or room is None:
         return redirect(url_for("home"))
 
+
+    print(room.messages)
     return render_template('room.html',code=room_code,messages=room.messages)
 
 @socketio.on("connect")
@@ -102,7 +106,7 @@ def connect(auth):
         return
 
     join_room(room_code)
-    send({"name": name,"message": "has entered the room","date": get_current_date()},to=room_code)
+    send({"name": name,"message": "has entered the room","date": get_current_date(),"text_color": room.text_color},to=room_code)
     room.members += 1
     print(f"{name} joined room {room_code}")
 
@@ -110,6 +114,7 @@ def connect(auth):
 def disconnect():
     room_code = session.get("room")
     name = session.get("name")
+
 
     room: Room = get_room(room_code)
 
@@ -119,7 +124,7 @@ def disconnect():
             rooms.rooms.remove(room)
             del room
 
-    send({"name": name, "message": "has left the room","date": get_current_date()}, to=room_code)
+    send({"name": name, "message": "has left the room","date": get_current_date(),"text_color": room.text_color}, to=room_code)
     print(f"{name} has left the room {room_code}")
 
     leave_room(room_code)
@@ -128,13 +133,24 @@ def disconnect():
 def message(data):
     room_code = session.get("room")
     room: Room = get_room(room_code)
+
     if room not in rooms.rooms:
         return
+
+
+    if data['text_color'] and f"color: {data['text_color']}" != room.text_color:
+        print(f"color: {data['text_color']}")
+        print(room.text_color)
+
+        room.text_color = f"color: {data['text_color']}"
+        send({"name": session["name"], "message": f"changed the room {room.text_color}", "date": get_current_date(), "text_color": room.text_color},
+             to=room_code)
 
     content = {
         "name": session.get("name"),
         "message": data["data"],
-        "date": get_current_date()
+        "date": get_current_date(),
+        "text_color": room.text_color,
     }
 
     send(content,to=room_code)
